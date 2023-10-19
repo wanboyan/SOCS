@@ -8,3 +8,15 @@ visualization of coordinate in SOCS:
 ![teaser2](pic/d2171df993a2789e431c73115cda8b06.gif)
 pose optimization by SOCS
 ![teaser3](pic/animation.gif)
+
+## Training
+
+```shell
+python -m engine.NFtrain_v5 --per_obj bottle --dataset Real --dataset_dir /nocs_data \
+--keypoint_path /nocs_data/keypoint.pkl \
+--lr 0.003 \
+--aug_bg 0 \
+--train_steps 1500 \
+--use_deform 1 \
+--model_save output/whole_lr0.003_1500_deform
+```
