@@ -72,7 +72,7 @@ def evaluate(argv):
         network = network.eval()
         pred_results = []
         for i, data in tqdm(enumerate(val_dataset, 1)):
-            if data is None or i<1671:
+            if data is None:
                 continue
             data, detection_dict, gts = data
             mean_shape = data['mean_shape'].to(device)

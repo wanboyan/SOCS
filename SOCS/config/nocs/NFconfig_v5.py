@@ -151,7 +151,7 @@ flags.DEFINE_string('device', 'cuda:0', '')
 flags.DEFINE_integer("num_workers", 8, "cpu cores for loading dataset")
 flags.DEFINE_integer('batch_size', 16, '')
 flags.DEFINE_integer('total_epoch', 70, 'total epoches in training')
-flags.DEFINE_integer('train_steps', 1000, 'number of batches in each epoch')  # batchsize is 8, then 3000
+flags.DEFINE_integer('train_steps', 1500, 'number of batches in each epoch')  # batchsize is 8, then 3000
 #####################space is not enough, trade time for space####################
 flags.DEFINE_integer('accumulate', 1, '')   # the real batch size is batchsize x accumulate
 

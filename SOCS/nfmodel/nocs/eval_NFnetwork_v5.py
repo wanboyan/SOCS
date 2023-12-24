@@ -147,31 +147,10 @@ class multi_NFPose(nn.Module):
         pose=gettrans(cor0.reshape((num_cor, 3)), pred_axis.reshape((num_cor, 1, 3)))
         fake_rotation = pose[0][0:3, 0:3]
 
-        a=0
-        delta_t1 = torch.rand(3)
-        delta_t1 = delta_t1.uniform_(-0.00, 0.00)
 
-        x=torch.Tensor(1)
-        x.uniform_(-a,a)
-        y=torch.Tensor(1)
-        y.uniform_(-a,a)
-        z=torch.Tensor(1)
-        z.uniform_(-a,a)
-        delta_r1 = get_rotation_torch(x, y, z)
-        init_R=gt_R.cpu().numpy()@ delta_r1.numpy()
-
-        grid_rotation=init_R
-        grid_T=gt_T.cpu().numpy()+delta_t1.numpy()
-        grid_s=real_shape.cpu().numpy()
-
-
-        # fake_rotation=gt_R.cpu().numpy() @ delta_r1.numpy()
-        # Pred_T=gt_T.cpu().numpy()+delta_t1.numpy()
-        # Pred_s=real_shape.cpu().numpy()
-
-        # grid_rotation=fake_rotation
-        # grid_T=Pred_T
-        # grid_s=Pred_s
+        grid_rotation=fake_rotation
+        grid_T=Pred_T
+        grid_s=Pred_s
 
         fake_grid = grids['fake_grid'].numpy()
         boxsize = FLAGS.fake_radius*2
@@ -211,78 +190,6 @@ class multi_NFPose(nn.Module):
 
 
 
-        if FLAGS.pic_save:
-            box_size = 0.7
-            sample_num=1000
-            points_uniform = np.random.rand(sample_num, 3)
-            points_uniform = box_size * (points_uniform - 0.5)-np.array([0,0,0.1])
-            sample_nocs=torch.from_numpy(points_uniform).float().cuda().detach()
-            diag=torch.norm(gt_s)
-
-
-            support0=feature_dict['conv0']['pos']
-            support2=feature_dict['conv2']['pos']
-            support4=feature_dict['conv4']['pos']
-
-            support0=torch.from_numpy(filter_outlier(support0[0].cpu().numpy())).float().unsqueeze(0).cuda()
-            support0_num=support0.shape[1]
-            pred_support0_bin=cat_model.qnet(support0,feature_dict_base)['second'].reshape(1,support0_num,3,FLAGS.bin_size)
-            pred_support0_bin_max=pred_support0_bin.max(-1)[1]
-            pred_support0_nocs_nu=to_value(cat_name,sym[0],FLAGS.bin_size,pred_support0_bin_max)[0]
-
-
-
-
-
-
-
-
-
-
-            support0_nocs=((support0-gt_T) @ gt_R/(diag))[0]
-            support2_nocs=((support2-gt_T) @ gt_R/(diag))[0]
-            support4_nocs=((support4-gt_T) @ gt_R/(diag))[0]
-            support0_nocs_nu=((support0-gt_T) @ gt_R/(gt_s))[0]
-            support2_nocs_nu=((support2-gt_T) @ gt_R/(gt_s))[0]
-            support4_nocs_nu=((support4-gt_T) @ gt_R/(gt_s))[0]
-            neighbor_pos=get_neighbor(sample_nocs,support0_nocs,1)
-            min_distance=torch.norm(neighbor_pos-sample_nocs,dim=-1)
-            near_sample_nocs=sample_nocs[min_distance<0.1]
-            # show_sample(support0_nocs.cpu().numpy(),support0_nocs.cpu().numpy(),
-            #             os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_sample_surface.png'))
-            # show_sample(support0_nocs.cpu().numpy(),near_sample_nocs.cpu().numpy(),
-            #             os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_sample_near_surface.png'))
-            # show_sample(support0_nocs.cpu().numpy(),sample_nocs.cpu().numpy(),
-            #             os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_sample_space.png'))
-
-
-            sample_space= (sample_nocs * diag) @ gt_R.T +gt_T
-            sample_nocs_nu=sample_nocs*diag/gt_s
-            # show_open3d(sample_nocs_camera.cpu().numpy(),support0[0].cpu().numpy())
-            sample_num=sample_nocs.shape[0]
-            pred_space_bin=cat_model.qnet(sample_space.unsqueeze(0),feature_dict)['second'].reshape(1,sample_num,3,FLAGS.bin_size)
-            pred_space_bin_max=pred_space_bin.max(-1)[1]
-            pred_space_nocs_nu=to_value(cat_name,sym[0],FLAGS.bin_size,pred_space_bin_max)[0]
-            space_nu_error=torch.norm(pred_space_nocs_nu-sample_nocs_nu,dim=-1)/0.8
-            show_error_2(support0_nocs.cpu().numpy(),sample_nocs.cpu().numpy(),error=space_nu_error.cpu().numpy(),
-                       outpath=os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_error_1.png'))
-
-            near_sample= (near_sample_nocs * diag) @ gt_R.T +gt_T
-            near_nocs_nu=near_sample_nocs*diag/gt_s
-            # show_open3d(sample_nocs_camera.cpu().numpy(),support0[0].cpu().numpy())
-            near_num=near_sample_nocs.shape[0]
-            pred_near_bin=cat_model.qnet(near_sample.unsqueeze(0),feature_dict_base)['second'].reshape(1,near_num,3,FLAGS.bin_size)
-            pred_near_bin_max=pred_near_bin.max(-1)[1]
-            pred_near_nocs_nu=to_value(cat_name,sym[0],FLAGS.bin_size,pred_near_bin_max)[0]
-            near_nu_error=torch.norm(pred_near_nocs_nu-near_nocs_nu,dim=-1)/1.2
-            show_error_2(support0_nocs.cpu().numpy(),near_sample_nocs.cpu().numpy(),error=near_nu_error.cpu().numpy(),
-                         outpath=os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_error_2.png'))
-
-
-
-            support0_nu_error=torch.norm(pred_support0_nocs_nu-support0_nocs_nu,dim=-1)/1
-            show_error_2(support0_nocs.cpu().numpy(),support0_nocs.cpu().numpy(),error=support0_nu_error.cpu().numpy(),
-                         outpath=os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_error_3.png'))
 
 
 
@@ -313,186 +220,6 @@ class multi_NFPose(nn.Module):
             std_model_noc_color=(std_model_nocs.cpu().numpy()-nocs_start)/nocs_norm
             std_model_noc_color=np.clip(std_model_noc_color,0,1)
 
-
-            # show_nocs(std_model_nocs.cpu().numpy(),nocs=std_model_noc_color)
-            # show_nocs(support0_nocs.cpu().numpy(),nocs=support0_nocs_std_color)
-            # show_nocs(support0_nocs.cpu().numpy(),nocs=support0_nocs_color)
-
-            # support0_nocs_std=support0_nocs_nu_deform*std_size/std_diag
-            # support0_nocs_nu_deform_error=torch.norm(pred_support0_nocs_nu-support0_nocs_nu_deform,dim=-1)/0.3
-            # support0_nocs_nu_error=torch.norm(pred_support0_nocs_nu-support0_nocs_nu,dim=-1)/0.3
-            #
-            #
-            # support0_nocs_color=(support0_nocs+0.6)*0.9
-            # support0_nocs_color=torch.clamp(support0_nocs_color,0,1)
-            # support0_nocs_std_color=(support0_nocs_std+0.6)*0.9
-            # support0_nocs_std_color=torch.clamp(support0_nocs_std_color,0,1)
-            # show_error(support0_nocs.cpu().numpy(),error=support0_nocs_nu_deform_error.cpu().numpy(),
-            #            outpath=os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_error_1.png'))
-            # show_error(support0_nocs.cpu().numpy(),error=support0_nocs_nu_error.cpu().numpy(),
-            #            outpath=os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_error_2.png'))
-            # show_error(support0_nocs.cpu().numpy())
-                       # outpath=os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+'_pure_surface.png')
-            #
-            #
-            #
-            from evaluation.utils.eval_utils import draw_single_results
-            real_intrinsics = np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]], dtype=np.float)
-            pred_sRt = np.eye(4)
-            pred_sRt[:3,:3]=fake_rotation
-            pred_sRt[:3,3]=(Pred_T+center.reshape(3).cpu().numpy())
-            #
-            gt_sRt = np.eye(4)
-            gt_sRt[:3,:3]=gt_R.cpu().numpy()
-            gt_sRt[:3,3]=(gt_T.cpu().numpy()+center.reshape(3).cpu().numpy())
-            gt_s=gt_s.cpu().numpy()
-            #
-            draw_single_results(rgb_whole.copy(),FLAGS.pic_save_dir,'pred_pose',FLAGS.cur_eval_index,real_intrinsics,
-                                pred_sRt[None,:,:],Pred_s[None,:],[6],color=(0,255,0),)
-            draw_single_results(rgb_whole.copy(),FLAGS.pic_save_dir,'gt_pose',FLAGS.cur_eval_index,real_intrinsics,
-                                gt_sRt[None,:,:],gt_s[None,:],[6],color=(0,255,0),)
-
-
-
-            # range=0.6
-            # grid_x, grid_y = np.mgrid[-range:range:100j,
-            #        -range:range:100j]
-            # split=grid_x.shape[0]
-            # gt_s_max=gt_s.max()
-            # x=torch.from_numpy(grid_x).float().cuda()
-            # y=torch.from_numpy(grid_y).float().cuda()
-            # x=x*gt_s_max/gt_s[0]
-            # y=y*gt_s_max/gt_s[1]
-            # z=torch.zeros_like(x)
-            # plane_query_nocs=torch.stack([x,y,z],dim=-1).reshape(1,-1,3)
-            # plane_query_nocs_deform=torch_tps_regular_transform(plane_query_nocs,
-            #                                             coefficients.unsqueeze(0),control_points.unsqueeze(0))[0]
-            # plane_query=(plane_query_nocs*gt_s) @ gt_R.T + gt_T
-            #
-            # # surf_nocs=(pc_center-gt_T) @ gt_R / gt_s_max
-            #
-            # surf_nocs=model_point.unsqueeze(0).cuda()/gt_s_max
-            #
-            # surf_nocs_xy=surf_nocs[torch.abs(surf_nocs[:,:,2])<1]
-            #
-            # surf_nocs_xy_np=surf_nocs_xy.cpu().numpy()
-            #
-            # # surf_nocs_xy_np=filter_outlier(surf_nocs_xy_np)
-            # if cat_name in self.base_cats:
-            #     pred_plane_nocs_bin=cat_base.qnet(plane_query,feature_dict)
-            # else:
-            #     pred_plane_nocs_bin=cat_model.qnet(plane_query,feature_dict)['second']
-            #
-            # pred_plane_nocs_bin=pred_plane_nocs_bin.reshape(1,-1,3,FLAGS.bin_size).permute(0,3,1,2).detach()
-            # pred_plane_nocs_bin_max=pred_plane_nocs_bin.max(1)[1]
-            # pred_plane_nocs=to_value(cat_name,sym[0],FLAGS.bin_size,pred_plane_nocs_bin_max)
-            # if sym[0]==1:
-            #     plane_query_nocs_r=plane_query_nocs.clone()
-            #     plane_query_nocs_r[:,:,0]=torch.norm(plane_query_nocs_r[:,:,(0,2)],dim=-1)
-            #     error=torch.norm(pred_plane_nocs[:,:,:2] - plane_query_nocs_r[:,:,:2], dim=-1)
-            #     # error=error.reshape(split,split)
-            #     fake_error=torch.norm(plane_query_nocs_deform-plane_query_nocs, dim=-1)
-            #
-            # else:
-            #     error=torch.norm(pred_plane_nocs - plane_query_nocs, dim=-1)
-            #     fake_error=torch.norm(plane_query_nocs_deform-plane_query_nocs, dim=-1)
-            #
-            #
-            # fig, ax = plt.subplots()
-            # ax.set_aspect("equal")
-            # grid_x_min=grid_x.min()
-            # grid_x_max=grid_x.max()
-            # grid_y_min=grid_y.min()
-            # grid_y_max=grid_y.max()
-            # ax.set_xlim(grid_x_min,grid_x_max)
-            # ax.set_ylim(grid_y_min,grid_y_max)
-            # error=error.reshape(-1)
-            # error=error.cpu().numpy()
-            # fake_error=fake_error.cpu().numpy()
-            # cm=plt.cm.get_cmap('jet')
-            # error_color=cm(error/0.6)
-            # error_color=error_color.reshape(split,split,4)
-            # # ax.imshow(error_color, origin="lower", extent=[-range,range,-range,range],interpolation='nearest')
-            # # plt.pcolormesh(grid_x, grid_y, error.reshape(split,split), cmap =cm, vmin = 0, vmax = 0.8)
-            #
-            # plt.pcolormesh(grid_x, grid_y, fake_error.reshape(split,split), cmap =cm, vmin = 0, vmax = 0.5)
-            # plt.scatter(surf_nocs_xy_np[:,0], surf_nocs_xy_np[:,1],color='black',s=8)
-            # plt.axis('off')
-            # plt.savefig(os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+cat_name+'dis_error_1.png'))
-            #
-            #
-            # range=0.6
-            # grid_x, grid_z = np.mgrid[-range:range:100j,
-            #                  -range:range:100j]
-            # split=grid_x.shape[0]
-            # gt_s_max=gt_s.max()
-            # x=torch.from_numpy(grid_x).float().cuda()
-            # z=torch.from_numpy(grid_z).float().cuda()
-            # x=x*gt_s_max/gt_s[0]
-            # z=z*gt_s_max/gt_s[2]
-            # y=torch.zeros_like(x)
-            # plane_query_nocs=torch.stack([x,y,z],dim=-1).reshape(1,-1,3)
-            #
-            # plane_query_nocs_deform=torch_tps_regular_transform(plane_query_nocs,
-            #                                                     coefficients.unsqueeze(0),control_points.unsqueeze(0))[0]
-            #
-            # plane_query=(plane_query_nocs*gt_s) @ gt_R.T + gt_T
-            #
-            # # surf_nocs=(pc_center-gt_T) @ gt_R / gt_s_max
-            #
-            # surf_nocs=model_point.unsqueeze(0).cuda()/gt_s_max
-            #
-            # surf_nocs_xy=surf_nocs[torch.abs(surf_nocs[:,:,1])<1]
-            #
-            # surf_nocs_xy_np=surf_nocs_xy.cpu().numpy()
-            #
-            # # surf_nocs_xy_np=filter_outlier(surf_nocs_xy_np)
-            # if cat_name in self.base_cats:
-            #     pred_plane_nocs_bin=cat_base.qnet(plane_query,feature_dict)
-            # else:
-            #     pred_plane_nocs_bin=cat_model.qnet(plane_query,feature_dict)['second']
-            #
-            # pred_plane_nocs_bin=pred_plane_nocs_bin.reshape(1,-1,3,FLAGS.bin_size).permute(0,3,1,2).detach()
-            # pred_plane_nocs_bin_max=pred_plane_nocs_bin.max(1)[1]
-            # pred_plane_nocs=to_value(cat_name,sym[0],FLAGS.bin_size,pred_plane_nocs_bin_max)
-            # if sym[0]==1:
-            #     plane_query_nocs_r=plane_query_nocs.clone()
-            #     plane_query_nocs_r[:,:,0]=torch.norm(plane_query_nocs_r[:,:,(0,2)],dim=-1)
-            #     error=torch.norm(pred_plane_nocs[:,:,:2] - plane_query_nocs_r[:,:,:2], dim=-1)
-            #     # error=error.reshape(split,split)
-            # else:
-            #     error=torch.norm(pred_plane_nocs - plane_query_nocs, dim=-1)
-            # fake_error=torch.norm(plane_query_nocs_deform-plane_query_nocs, dim=-1)
-            #
-            # fig, ax = plt.subplots()
-            # ax.set_aspect("equal")
-            # grid_x_min=grid_x.min()
-            # grid_x_max=grid_x.max()
-            # grid_z_min=grid_z.min()
-            # grid_z_max=grid_z.max()
-            # ax.set_xlim(grid_x_min,grid_x_max)
-            # ax.set_ylim(grid_z_min,grid_z_max)
-            # error=error.reshape(-1)
-            # error=error.cpu().numpy()
-            # fake_error=fake_error.cpu().numpy()
-            # cm=plt.cm.get_cmap('jet')
-            # error_color=cm(error/0.6)
-            # error_color=error_color.reshape(split,split,4)
-            # # ax.imshow(error_color, origin="lower", extent=[-range,range,-range,range],interpolation='nearest')
-            # plt.pcolormesh(grid_x, -grid_z, error.reshape(split,split), cmap =cm, vmin = 0, vmax = 0.8)
-            # plt.pcolormesh(grid_x, -grid_z, fake_error.reshape(split,split), cmap =cm, vmin = 0, vmax = 0.5)
-            # plt.scatter(surf_nocs_xy_np[:,0], -surf_nocs_xy_np[:,2],color='black',s=8)
-            # plt.axis('off')
-            # # plt.show()
-            # gt_sRt = np.eye(4)
-            # gt_sRt[:3,:3]=gt_R.cpu().numpy()
-            # gt_sRt[:3,3]=(gt_T.cpu().numpy()+center.reshape(3).cpu().numpy())
-            # gt_s=gt_s.cpu().numpy()
-
-            plt.savefig(os.path.join(FLAGS.pic_save_dir,str(FLAGS.cur_eval_index)+cat_name+'dis_error_2.png'))
-            plt.close('all')
-            gc.collect()
-            return torch.from_numpy(gt_sRt),torch.from_numpy(gt_s)
 
 
 
@@ -590,20 +317,6 @@ class multi_NFPose(nn.Module):
             l2=0
             if FLAGS.use_prob:
 
-                # if sym[0]==1:
-                #     cal_fake_nocs_r=cal_fake_nocs
-                #     cal_fake_nocs_r[:,:,0]=torch.norm(cal_fake_nocs[:,:,(0,2)],dim=-1)
-                #     distance=cal_fake_nocs_r.unsqueeze(-1)-bin_value
-                # else:
-                #     distance=cal_fake_nocs.unsqueeze(-1)-bin_value
-                # gamma=100
-                # smooth_target=nn.functional.softmax(-distance**2*gamma,dim=-1)
-                #
-                # pad_log_prob=torch.sum(pred_fake_dis_log_dict[stage]*smooth_target,dim=-1)
-                # if sym[0]==1:
-                #     log_prob=pad_log_prob[:,:,:2].sum(-1).mean()
-                # else:
-                #     log_prob=pad_log_prob.sum(-1).mean()
 
                 if FLAGS.eval_use_deform:
                     keypoint_num=new_key_coeff.shape[0]
@@ -638,19 +351,6 @@ class multi_NFPose(nn.Module):
                     pred_fake_nocs_deform=pred_fake_nocs
 
                 if sym[0]==1 and FLAGS.min_loss==0:
-                    # pred_fake_nocs_deform[:,:,2]=0
-                    # base=60
-                    # sym_Rs=torch.zeros([base,3,3],dtype=torch.float32, device=pred_fake_nocs_deform.device)
-                    # for i in range(base):
-                    #     theta=float(i/base)*2*math.pi
-                    #     sym_Rs[i]=torch.tensor([[math.cos(theta), 0, math.sin(theta)],
-                    #                             [0, 1, 0],
-                    #                             [-math.sin(theta), 0, math.cos(theta)]])
-                    # sym_pred_fake_nocs_deform=torch.matmul(pred_fake_nocs_deform.unsqueeze(1),sym_Rs.permute(0,2,1).unsqueeze(0))
-                    # sym_pred_fake=(sym_pred_fake_nocs_deform*cur_s) @ cur_R.T + cur_t
-                    # sym_distance=torch.norm(sym_pred_fake - fake_query.unsqueeze(1), dim=-1).mean(dim=-1)
-                    # distance=sym_distance[0].min()
-                    # scene_score=distance
 
                     cal_fake_nocs_r=torch.norm(cal_fake_nocs[:,:,(0,2)],dim=-1)
                     cal_fake_nocs[:,:,0]=cal_fake_nocs_r
